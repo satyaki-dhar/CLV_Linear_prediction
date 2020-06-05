@@ -1,0 +1,165 @@
+#Final Project of R
+
+library(boot) 
+library(car)
+library(QuantPsyc)
+library(lmtest)
+library(sandwich)
+library(vars)
+library(nortest)
+library(MASS)
+library(caTools)
+library(dplyr)
+library(lattice)
+#IMporting data
+
+data <- read.csv(file.choose())
+table(data$Income)
+data1 <- data
+str(data1)
+#renaming column names
+colnames(data1)[which(names(data)=="Customer.Lifetime.Value")]="clv"
+str(data1)
+#missing value treatment
+as.data.frame(colSums(is.na(data1)))
+data2=select(data1,-c(Customer,State,Effective.To.Date))
+str(data2)
+#Data visualisation
+hist(data2$clv)
+densityPlot(data2$clv)
+densityplot(data2$Income)
+plot(data2[c("Income", "Total.Claim.Amount", "clv")])
+#Conversion of data
+data2$Number.of.Policies <- as.factor(data2$Number.of.Policies)
+data2$Number.of.Open.Complaints <- as.factor(data2$Number.of.Open.Complaints)
+str(data2)
+#Distribution of target variables
+boxplot(data2$clv)
+quantile(data2$clv,c(0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,0.99,0.995,1))
+data3 <- data2[data2$clv <14420, ]
+boxplot(data3$clv)
+
+#Distribution of independent variable
+boxplot(data3$Income)
+boxplot(data3$Monthly.Premium.Auto)
+quantile(data3$Monthly.Premium.Auto,c(0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,0.99,0.995,1))
+data4 <- data3[data3$Monthly.Premium.Auto <159,]
+boxplot(data4$Monthly.Premium.Auto)
+nrow(data3)-nrow(data4)
+
+boxplot(data4$Months.Since.Last.Claim)
+
+boxplot(data4$Months.Since.Policy.Inception)
+
+boxplot(data4$Total.Claim.Amount)
+quantile(data4$Total.Claim.Amount,c(0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,0.99,0.995,1))
+data5<- data4[data4$Total.Claim.Amount < 895,]
+boxplot(data5$Total.Claim.Amount)
+nrow(data4)-nrow(data5)
+str(data5)
+
+#Cross validation
+set.seed(1234)
+spl = sample.split(data5$clv, 0.7)
+original.data<- subset(data5, spl==T)
+str(original.data)
+nrow(original.data)
+test.data <- subset(data5, spl==F)
+str(test.data)
+nrow(test.data)
+#Model building
+
+model0<- lm(clv~., data = original.data)
+summary(model0)
+
+
+#Removal of policytype
+model1=lm(clv~Response+	Coverage+	Education+	EmploymentStatus+	Gender+	Income+	Location.Code+	Marital.Status+	Monthly.Premium.Auto+	Months.Since.Last.Claim+	Months.Since.Policy.Inception+	Number.of.Open.Complaints+	Number.of.Policies +	Renew.Offer.Type+	Sales.Channel+	Total.Claim.Amount+	Vehicle.Class+	Vehicle.Size, data=original.data)
+summary(model1)
+
+
+vif(model1)
+
+m1 <- lm(clv ~ Coverage + Education + EmploymentStatus + Gender + Income + 
+           Location.Code + Marital.Status + Monthly.Premium.Auto + Months.Since.Last.Claim + 
+           Months.Since.Policy.Inception + Number.of.Open.Complaints + 
+           Number.of.Policies + Total.Claim.Amount, data = original.data)
+summary(m1)
+
+m2 <- lm(clv ~ Coverage + Education + EmploymentStatus + Gender + Income + 
+            + Marital.Status + Monthly.Premium.Auto + Months.Since.Last.Claim + 
+           Months.Since.Policy.Inception + Number.of.Open.Complaints + 
+           Number.of.Policies + Total.Claim.Amount, data = original.data)
+summary(m2)
+
+
+
+m3 <- lm(clv ~ Coverage + Education  + Gender + Income + I(EmploymentStatus=="Employed")+ I(EmploymentStatus=="Medical Leave")
+           + Marital.Status + Monthly.Premium.Auto + Months.Since.Last.Claim + 
+           Months.Since.Policy.Inception + Number.of.Open.Complaints + 
+           Number.of.Policies, data = original.data)
+summary(m3)
+anova(m3)
+m4 <- lm(clv ~ I(Coverage == "Extended") + Education  + Gender + Income + I(EmploymentStatus=="Employed")
+         + Marital.Status + Monthly.Premium.Auto + 
+           Months.Since.Policy.Inception + Number.of.Open.Complaints + 
+           Number.of.Policies, data = original.data)
+summary(m4)
+vif(m4)
+#Removing month since policy inception
+
+m5 <- lm(clv ~ Coverage + Education  + Gender + Income + I(EmploymentStatus=="Employed")+ I(EmploymentStatus=="Medical Leave")
+          + Monthly.Premium.Auto + Marital.Status+
+            I(Number.of.Open.Complaints== "3") + I(Number.of.Open.Complaints== "4")+I(Number.of.Open.Complaints== "5")+
+           Number.of.Policies, data = original.data)
+summary(m5)
+vif(m5)
+anova(m5)
+########################DEal with m5
+table(original.data$Number.of.Open.Complaints)
+table(original.data$Coverage)
+pie(c(3411, 1528, 72 ), labels = c("Basic", "Extended",  "Premium"))
+hist(original.data$Income)
+pie(c(1570, 1574,205, 1511,451),labels = c("Bachelor", "College","Doctor", "High School or Below","Master"))
+pie(c(800,3167,1344), labels = c("Divorced", "Married", "Single"))
+abline(lm(original.data$clv~original.data$Monthly.Premium.Auto), col="red")
+plot(original.data$Income,original.data$clv)
+plot(original.data$Monthly.Premium.Auto,original.data$clv)
+table(original.data$Education)
+table(original.data$Gender)
+barplot(c(2734 ,2577),names.arg = c("Female", "Male"))
+table(original.data$Marital.Status)
+table(original.data$EmploymentStatus)
+pie(c(255,3406,251,181,1218), labels = c("Disabled", "Employed", "Medical leave", "Retired", "Unemployed"))
+table(original.data$Number.of.Open.Complaints)
+pie(c(4239,572,207,169,92,32), labels = c("zero", "one", "two","three","four","five"))
+table(original.data$Number.of.Policies)
+pie(c(2079,926,742,265,255,253,284,241,266), labels = c("One", "two","three","four","five","six","seven","Eight","nine"))
+library(ggplot2)
+ggplot(original.data, aes(x = original.data$Monthly.Premium.Auto, y = original.data$clv)) + 
+  geom_point() 
+
+ggplot(original.data, aes(x = original.data$clv, y = original.data$pred)) + 
+  geom_point() 
+
+
+
+original.data$pred <- fitted(m5)
+attach(original.data)
+MAPE<-print((sum((abs(clv-pred))/clv))/nrow(original.data))
+
+attach(test.data)
+MAPE<-print((sum((abs(clv-pred))/clv))/nrow(test.data))
+par(mfrow=c(2,2))
+plot(m5)
+
+
+
+
+dwtest(m5)
+bptest(m5)
+ncvTest(m5)
+ad.test(m4)
+resids <- m5$residuals
+ad.test(resids)
+qqnorm(resids)
